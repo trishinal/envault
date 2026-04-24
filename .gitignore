@@ -1,0 +1,8 @@
+node_modules/
+out/
+*.js.map
+build/
+npm-debug.log*
+.env
+.cache/
+dist/
