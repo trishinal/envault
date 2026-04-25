@@ -12,6 +12,13 @@ This module provides AES-256-GCM authenticated encryption for envault vaults.
    [ salt (16) | iv (12) | tag (16) | ciphertext (n) ]  →  base64 string
    ```
 
+   | Field      | Offset | Length    |
+   |------------|--------|-----------|
+   | `salt`     | 0      | 16 bytes  |
+   | `iv`       | 16     | 12 bytes  |
+   | `tag`      | 28     | 16 bytes  |
+   | ciphertext | 44     | n bytes   |
+
 4. **Decryption** — The payload is split by fixed offsets, the key is re-derived, and GCM authentication is verified before returning plaintext.
 
 ## Public API
@@ -24,8 +31,15 @@ This module provides AES-256-GCM authenticated encryption for envault vaults.
 | `encryptVault(record, password)` | Serialize + encrypt an env record |
 | `decryptVault(ciphertext, password)` | Decrypt + deserialize an env record |
 
+## Error handling
+
+- `decrypt` and `decryptVault` throw a `DecryptionError` if the GCM tag verification fails (wrong password or tampered payload).
+- `decryptVault` additionally throws a `ParseError` if the decrypted bytes are not valid JSON.
+- Both errors extend `Error` and include a descriptive `.message`; callers should catch them explicitly.
+
 ## Security notes
 
 - Every `encrypt` call generates a fresh random salt and IV — identical plaintexts produce different ciphertexts.
 - The GCM auth tag detects any tampering with the ciphertext.
 - The master password is never stored; only the encrypted blob is written to disk.
+- `deriveKey` is exported **for testing only** — avoid calling it directly in application code.
