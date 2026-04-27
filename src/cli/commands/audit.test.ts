@@ -52,4 +52,20 @@ describe("auditEntries", () => {
     const results = auditEntries({});
     expect(results).toHaveLength(0);
   });
+
+  it("flags keys with placeholder values", () => {
+    const entries = {
+      API_KEY: "changeme",
+      DB_PASSWORD: "your_password_here",
+      SECRET: "example",
+    };
+    const results = auditEntries(entries);
+    const flaggedKeys = results.map((r) => r.key);
+    expect(flaggedKeys).toContain("API_KEY");
+    expect(flaggedKeys).toContain("DB_PASSWORD");
+    expect(flaggedKeys).toContain("SECRET");
+    results.forEach((r) => {
+      expect(r.issues.some((i) => i.includes("placeholder"))).toBe(true);
+    });
+  });
 });
