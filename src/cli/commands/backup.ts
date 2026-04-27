@@ -20,6 +20,20 @@ function getBackupPath(vaultDir: string, label?: string): string {
   return path.join(vaultDir, filename);
 }
 
+/**
+ * Verifies that the backup file exists and matches the source file size,
+ * providing a basic integrity check after copying.
+ */
+function verifyBackup(sourcePath: string, backupPath: string): boolean {
+  try {
+    const sourceStats = fs.statSync(sourcePath);
+    const backupStats = fs.statSync(backupPath);
+    return sourceStats.size === backupStats.size;
+  } catch {
+    return false;
+  }
+}
+
 export function registerBackup(program: import("commander").Command): void {
   program
     .command("backup")
@@ -45,6 +59,12 @@ export function registerBackup(program: import("commander").Command): void {
 
       try {
         fs.copyFileSync(vaultPath, backupPath);
+
+        if (!verifyBackup(vaultPath, backupPath)) {
+          console.error("Backup verification failed: file size mismatch.");
+          process.exit(1);
+        }
+
         console.log(`Vault backed up to: ${backupPath}`);
       } catch (err) {
         console.error("Failed to create backup:", (err as Error).message);
