@@ -2,67 +2,76 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { encryptVault } from "../../crypto/index";
+import { getBackupPath } from "./backup";
 
-function makeTempDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "envault-backup-test-"));
+function makeTempDir() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "envault-backup-"));
 }
 
-describe("backup command", () => {
-  let tempDir: string;
+describe("getBackupPath", () => {
+  it("returns a path ending in .backup", () => {
+    const vaultPath = "/home/user/.envault";
+    const result = getBackupPath(vaultPath);
+    expect(result).toMatch(/\.backup$/);
+  });
+
+  it("includes a timestamp in the backup path", () => {
+    const vaultPath = "/home/user/.envault";
+    const before = Date.now();
+    const result = getBackupPath(vaultPath);
+    const after = Date.now();
+    const match = result.match(/(\d+)\.backup$/);
+    expect(match).not.toBeNull();
+    const ts = parseInt(match![1], 10);
+    expect(ts).toBeGreaterThanOrEqual(before);
+    expect(ts).toBeLessThanOrEqual(after);
+  });
+});
+
+describe("backup command integration", () => {
+  let tmpDir: string;
 
   beforeEach(() => {
-    tempDir = makeTempDir();
+    tmpDir = makeTempDir();
+    vi.resetModules();
   });
 
   afterEach(() => {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
 
-  it("copies vault file to destination directory", () => {
-    const vaultFile = path.join(tempDir, "vault.enc");
-    const backupDir = path.join(tempDir, "backups");
-    fs.mkdirSync(backupDir);
-    fs.writeFileSync(vaultFile, "encrypted-data");
+  it("creates a backup file with same encrypted content", async () => {
+    const password = "backup-pass";
+    const data = { BACKUP_KEY: "backup_value" };
+    const encrypted = await encryptVault(data, password);
 
-    vi.spyOn(fs, "copyFileSync");
+    const vaultPath = path.join(tmpDir, ".envault");
+    fs.writeFileSync(vaultPath, encrypted, "utf-8");
 
-    fs.copyFileSync(vaultFile, path.join(backupDir, "vault-backup-test.enc"));
+    const backupPath = getBackupPath(vaultPath);
+    fs.copyFileSync(vaultPath, backupPath);
 
-    const files = fs.readdirSync(backupDir);
-    expect(files.length).toBe(1);
-    expect(files[0]).toContain("vault-backup");
+    expect(fs.existsSync(backupPath)).toBe(true);
+    const backupContent = fs.readFileSync(backupPath, "utf-8");
+    expect(backupContent).toBe(encrypted);
   });
 
-  it("backup file contains same content as source vault", () => {
-    const vaultFile = path.join(tempDir, "vault.enc");
-    const backupFile = path.join(tempDir, "vault-backup.enc");
-    const content = "super-secret-encrypted-content";
-    fs.writeFileSync(vaultFile, content);
+  it("backup can be decrypted with original password", async () => {
+    const password = "secure-pass";
+    const data = { ENV: "production", PORT: "3000" };
+    const encrypted = await encryptVault(data, password);
 
-    fs.copyFileSync(vaultFile, backupFile);
+    const vaultPath = path.join(tmpDir, ".envault");
+    const backupPath = path.join(tmpDir, "vault.backup");
+    fs.writeFileSync(vaultPath, encrypted, "utf-8");
+    fs.copyFileSync(vaultPath, backupPath);
 
-    const backupContent = fs.readFileSync(backupFile, "utf-8");
-    expect(backupContent).toBe(content);
-  });
-
-  it("generates unique filenames with timestamps", () => {
-    const names = new Set<string>();
-    for (let i = 0; i < 3; i++) {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      names.add(`vault-backup-${timestamp}.enc`);
-    }
-    // All generated names should follow the pattern
-    for (const name of names) {
-      expect(name).toMatch(/^vault-backup-.+\.enc$/);
-    }
-  });
-
-  it("includes label in filename when provided", () => {
-    const label = "pre-deploy";
-    const timestamp = "2024-01-01T00-00-00-000Z";
-    const filename = `vault-backup-${label}-${timestamp}.enc`;
-    expect(filename).toContain(label);
-    expect(filename).toContain("vault-backup");
+    const raw = fs.readFileSync(backupPath, "utf-8");
+    const { decryptVault } = await import("../../crypto/index");
+    const result = await decryptVault(raw, password);
+    expect(result["ENV"]).toBe("production");
+    expect(result["PORT"]).toBe("3000");
   });
 });
