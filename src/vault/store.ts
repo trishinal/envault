@@ -49,5 +49,16 @@ export async function loadVault(
     throw new Error(`No vault found at ${vaultPath}. Run 'envault init' first.`);
   }
   const encrypted = fs.readFileSync(vaultPath, 'utf-8');
-  return decryptVault(encrypted, passphrase) as Promise<VaultData>;
+  let data: VaultData;
+  try {
+    data = await decryptVault(encrypted, passphrase) as VaultData;
+  } catch {
+    throw new Error('Failed to decrypt vault. The passphrase may be incorrect.');
+  }
+  if (data.version !== VAULT_VERSION) {
+    throw new Error(
+      `Unsupported vault version ${data.version}. Expected version ${VAULT_VERSION}.`
+    );
+  }
+  return data;
 }
