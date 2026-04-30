@@ -15,6 +15,17 @@ export function promptPassword(prompt: string): Promise<string> {
   });
 }
 
+/**
+ * Creates a timestamped backup of the existing vault file before overwriting it.
+ * The backup is placed alongside the vault file with a `.bak.<timestamp>` suffix.
+ */
+function backupExistingVault(vaultPath: string): void {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupPath = `${vaultPath}.bak.${timestamp}`;
+  fs.copyFileSync(vaultPath, backupPath);
+  console.log(`Existing vault backed up to: ${backupPath}`);
+}
+
 export function registerRestore(program: import("commander").Command): void {
   program
     .command("restore <backupFile>")
@@ -53,6 +64,10 @@ export function registerRestore(program: import("commander").Command): void {
           console.log("Restore cancelled.");
           return;
         }
+      }
+
+      if (fs.existsSync(vaultPath)) {
+        backupExistingVault(vaultPath);
       }
 
       try {
