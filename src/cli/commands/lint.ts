@@ -21,22 +21,35 @@ export interface LintResult {
   warnings: string[];
 }
 
+/**
+ * Checks a single key/value pair for common issues.
+ * Returns an array of warning messages (empty if no issues found).
+ */
+function lintEntry(key: string, value: string): string[] {
+  const warnings: string[] = [];
+  if (!/^[A-Z][A-Z0-9_]*$/.test(key)) {
+    warnings.push('Key should be UPPER_SNAKE_CASE');
+  }
+  if (value.trim() === '') {
+    warnings.push('Value is empty or whitespace only');
+  }
+  if (value.length > 4096) {
+    warnings.push('Value is unusually long (>4096 chars)');
+  }
+  if (/\s/.test(value) && !value.startsWith('"') && !value.startsWith("'")) {
+    warnings.push('Value contains whitespace but is not quoted');
+  }
+  return warnings;
+}
+
+/**
+ * Lints all entries in the vault, returning results only for entries
+ * that have at least one warning.
+ */
 export function lintEntries(entries: Record<string, string>): LintResult[] {
   const results: LintResult[] = [];
   for (const [key, value] of Object.entries(entries)) {
-    const warnings: string[] = [];
-    if (!/^[A-Z][A-Z0-9_]*$/.test(key)) {
-      warnings.push('Key should be UPPER_SNAKE_CASE');
-    }
-    if (value.trim() === '') {
-      warnings.push('Value is empty or whitespace only');
-    }
-    if (value.length > 4096) {
-      warnings.push('Value is unusually long (>4096 chars)');
-    }
-    if (/\s/.test(value) && !value.startsWith('"') && !value.startsWith("'")) {
-      warnings.push('Value contains whitespace but is not quoted');
-    }
+    const warnings = lintEntry(key, value);
     if (warnings.length > 0) {
       results.push({ key, warnings });
     }
