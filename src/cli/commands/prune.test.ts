@@ -80,4 +80,11 @@ describe("pruneExpiredEntries", () => {
       pruneExpiredEntries(password, { vaultDir: tmpDir })
     ).rejects.toThrow("No vault found");
   });
+
+  it("throws on wrong password", async () => {
+    await makeVaultWithEntries(tmpDir, password);
+    await expect(
+      pruneExpiredEntries("wrong-password", { vaultDir: tmpDir })
+    ).rejects.toThrow();
+  });
 });
