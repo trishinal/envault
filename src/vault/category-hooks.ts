@@ -34,13 +34,13 @@ export function getCategoryForKey(vaultDir: string, key: string): string | undef
   return readCategories(vaultDir)[key];
 }
 
-export function clearCategoryForKey(vaultDir: string, key: string): void {
+export function removeCategoryForKey(vaultDir: string, key: string): void {
   const categories = readCategories(vaultDir);
   delete categories[key];
   writeCategories(vaultDir, categories);
 }
 
-export function getKeysInCategory(vaultDir: string, category: string): string[] {
+export function getKeysByCategory(vaultDir: string, category: string): string[] {
   const categories = readCategories(vaultDir);
   return Object.entries(categories)
     .filter(([, cat]) => cat === category)
